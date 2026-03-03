@@ -1,0 +1,58 @@
+name: CD - Deploy & Smoke Test
+
+# mainブランチへのプッシュでRailwayが自動デプロイされる。
+# このワークフローはデプロイ後にヘルスチェックを実行してデプロイ成否を確認する。
+on:
+  push:
+    branches: [main]
+
+jobs:
+  smoke-test:
+    name: Smoke Test (post Railway deploy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Backend health check
+        # Railwayのデプロイ完了を待ちながら /health を最大10分ポーリングする
+        run: |
+          echo "Waiting for Railway backend deployment..."
+          BACKEND_URL="${{ vars.RAILWAY_BACKEND_URL }}"
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::error::RAILWAY_BACKEND_URL is not set. Add it to repository variables."
+            exit 1
+          fi
+          for i in $(seq 1 20); do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${BACKEND_URL}/health" 2>/dev/null || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Backend OK (attempt ${i}/20): HTTP ${STATUS}"
+              exit 0
+            fi
+            echo "Attempt ${i}/20: HTTP ${STATUS}, retrying in 30s..."
+            sleep 30
+          done
+          echo "::error::Backend health check timed out after 10 minutes."
+          exit 1
+
+      - name: Frontend health check
+        run: |
+          FRONTEND_URL="${{ vars.RAILWAY_FRONTEND_URL }}"
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "::error::RAILWAY_FRONTEND_URL is not set. Add it to repository variables."
+            exit 1
+          fi
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${FRONTEND_URL}/health" 2>/dev/null || echo "000")
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Frontend health check failed: HTTP ${STATUS}"
+            exit 1
+          fi
+          echo "✅ Frontend OK: HTTP ${STATUS}"
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "### ✅ スモークテスト通過" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| サービス | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | ${{ vars.RAILWAY_BACKEND_URL }}/health |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ vars.RAILWAY_FRONTEND_URL }}/health |" >> $GITHUB_STEP_SUMMARY

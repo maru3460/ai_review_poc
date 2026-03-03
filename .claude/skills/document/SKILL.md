@@ -11,5 +11,5 @@ description: "ドキュメント作成ルール"
 
 ### 保存場所(特に指示がない場合)
 
-`.github/tmp/xxx.md`
+`.claude/tmp/xxx.md`
 xxxはドキュメントの内容に応じた適切な名前に置き換えてください。

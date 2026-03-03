@@ -1,0 +1,18 @@
+# 環境変数
+.env
+backend/.env
+frontend/.env
+
+# 収集済みPRメタデータ
+backend/data/pr-metadata/
+
+# 依存パッケージ
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# 開発ツール一時ファイル
+.claude/tmp/
+
+# macOS
+.DS_Store
