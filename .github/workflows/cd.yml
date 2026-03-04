@@ -21,13 +21,18 @@ jobs:
             echo "::error::RAILWAY_BACKEND_URL is not set. Add it to repository variables."
             exit 1
           fi
+          BACKEND_URL="${BACKEND_URL%/}"
+          if [[ "$BACKEND_URL" != http://* && "$BACKEND_URL" != https://* ]]; then
+            BACKEND_URL="https://${BACKEND_URL}"
+          fi
+          HEALTH_URL="${BACKEND_URL}/health"
           for i in $(seq 1 20); do
-            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${BACKEND_URL}/health" 2>/dev/null || echo "000")
+            STATUS=$(curl -sS -L --max-redirs 5 -o /dev/null -w "%{http_code}" "$HEALTH_URL" 2>/dev/null || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "✅ Backend OK (attempt ${i}/20): HTTP ${STATUS}"
               exit 0
             fi
-            echo "Attempt ${i}/20: HTTP ${STATUS}, retrying in 30s..."
+            echo "Attempt ${i}/20: HTTP ${STATUS} (${HEALTH_URL}), retrying in 30s..."
             sleep 30
           done
           echo "::error::Backend health check timed out after 10 minutes."
@@ -40,9 +45,14 @@ jobs:
             echo "::error::RAILWAY_FRONTEND_URL is not set. Add it to repository variables."
             exit 1
           fi
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "${FRONTEND_URL}/health" 2>/dev/null || echo "000")
+          FRONTEND_URL="${FRONTEND_URL%/}"
+          if [[ "$FRONTEND_URL" != http://* && "$FRONTEND_URL" != https://* ]]; then
+            FRONTEND_URL="https://${FRONTEND_URL}"
+          fi
+          FRONTEND_HEALTH_URL="${FRONTEND_URL}/health"
+          STATUS=$(curl -sS -L --max-redirs 5 -o /dev/null -w "%{http_code}" "$FRONTEND_HEALTH_URL" 2>/dev/null || echo "000")
           if [ "$STATUS" != "200" ]; then
-            echo "::error::Frontend health check failed: HTTP ${STATUS}"
+            echo "::error::Frontend health check failed: HTTP ${STATUS} (${FRONTEND_HEALTH_URL})"
             exit 1
           fi
           echo "✅ Frontend OK: HTTP ${STATUS}"

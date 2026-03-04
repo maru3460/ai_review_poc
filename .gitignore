@@ -3,8 +3,8 @@
 backend/.env
 frontend/.env
 
-# 収集済みPRメタデータ
-backend/data/pr-metadata/
+# 生成データ
+backend/data/
 
 # 依存パッケージ
 node_modules/

@@ -25,10 +25,10 @@
 - [x] CD-1. Railway最小構成デプロイ（Backend + Frontend + Redis）
 - [x] CD-2. CDパイプライン実装（mainブランチトリガー）
 - [x] CD-3. デプロイ後スモークテスト実装（/health疎通確認）
-- [ ] 4. 静的解析パイプライン（PoC）
-- [ ] 5. 依存グラフ/呼び出しグラフ生成
-- [ ] 6. LLM入力整形レイヤ
-- [ ] 7. モード別生成ロジック（5モード）
+- [x] 4. 静的解析パイプライン（PoC）
+- [x] 5. 依存グラフ/呼び出しグラフ生成
+- [x] 6. LLM入力整形レイヤ
+- [x] 7. モード別生成ロジック（5モード）
 - [ ] 8. 可視化ページAPI
 - [ ] 9. 3ペインUI実装
 - [ ] 10. モード切替UX実装
@@ -114,14 +114,17 @@
 
 ### 4. 静的解析パイプライン（PoC）
 
-- 目的: シンボルと依存関係を抽出する
+- 目的: PR差分からシンボルと依存関係を抽出する
+- 実装アプローチ: Claude API（`@anthropic-ai/sdk`）に差分を渡し、`tool_use` で構造化JSON（Node/Edge）を生成
 - 成果物:
-  - 対応言語別抽出器（JS/TS/Ruby/C#）
-  - 抽出対象: function/class/import/export/call
-  - 正規化済みノード・エッジ出力
+  - `staticAnalyzer.js`（Claude API呼び出し・tool_use解析）
+  - `staticAnalysisStore.js`（`data/static-analysis/<repo>/pr-N.json` に保存）
+  - `ANTHROPIC_API_KEY` 未設定時のスキップ対応
+  - 入力: PR差分（patch文字列）+ タイトル/説明
+  - 出力: `Node[]` / `Edge[]`（最小データモデル）
 - DoD:
   - `Node`/`Edge`最小データモデルで出力できる
-  - 4言語のサンプル入力でクラッシュしない
+  - 4言語（JS/TS/Ruby/C#）のサンプル差分でクラッシュしない
 - 依存: 3
 
 ### 5. 依存グラフ/呼び出しグラフ生成
@@ -138,14 +141,15 @@
 
 ### 6. LLM入力整形レイヤ
 
-- 目的: 差分・コード文脈・メタ情報を安全にLLMへ渡す
+- 目的: 5モード可視化向けに差分・グラフ・メタ情報をLLMへ渡す入力を構築する
+  - ※タスク4の `staticAnalyzer.js` はグラフ抽出専用。本タスクは可視化モード生成向けの整形を担当する。
 - 成果物:
-  - 入力プロンプトビルダー
+  - モード別プロンプトビルダー（Node/Edgeグラフ + PRメタ情報を組み合わせる）
   - トークン超過時の要約/切り詰め戦略
-  - モデル抽象化インターフェース
+  - モデル抽象化インターフェース（将来的なモデル差し替え対応）
 - DoD:
   - 同一入力から再現性のある構造化リクエストを生成できる
-  - モデル切替（GPT/Claude/Gemini想定）が設定で可能
+  - モデル切替（Claude/GPT/Gemini想定）が設定で可能
 - 依存: 3,5
 
 ### 7. モード別生成ロジック（5モード）
@@ -286,3 +290,7 @@
 - 2026-03-02: タスク2「GitHub App連携と起動トリガー実装」のPoC実装を追加（`POST /webhooks/github`、イベント判定、簡易ジョブキュー、重複delivery抑止）
 - 2026-03-03: 検証環境をRailwayに決定。`requirements.md` にCD要件（5.4節・非機能要件・技術スタック）を追加、`tasks.md` にCD-1〜CD-3タスクとマイルストーン1.5を追加、タスク2/8/9/10/11のDoDを更新
 - 2026-03-03: CD-1〜CD-3のコード実装を完了。`PORT||BACKEND_PORT` フォールバック対応（config.js）、Redis TCP疎通確認ログ（server.js）、`backend/railway.toml`、`frontend/railway.toml`、`.github/workflows/cd.yml`（スモークテスト付きCDワークフロー）、`.gitignore` を整備。Railway ダッシュボード上の手動設定（サービス追加・環境変数設定・GitHub連携）は別途必要。
+- 2026-03-03: タスク4「静的解析パイプライン」実装完了。Claude API（`@anthropic-ai/sdk`、`claude-haiku-4-5`）を使った差分解析でNode/Edgeグラフを生成する。`staticAnalyzer.js`（AI解析コア）、`staticAnalysisStore.js`（JSON保存）を新規作成。`jobProcessor.js`（静的解析ステップ追加）、`config.js`（`ANTHROPIC_API_KEY` オプション追加）、`.env.example` を更新。`ANTHROPIC_API_KEY` 未設定時はスキップして既存機能に影響なし。テスト19件全パス。
+- 2026-03-04: タスク5「依存グラフ/呼び出しグラフ生成」実装完了。`graphBuilder.js`（BFSベースのトラバーサル）を新規作成。`buildGraph({ nodes, edges })` が `getChangedNodes` / `getNeighbors` / `extractSubgraph(startNodeId, maxDepth)` / `extractChangedSubgraph(maxDepth)` を持つグラフオブジェクトを返す。双方向トラバーサル対応、サイクル耐性あり、Workflow用maxDepth=3制限が機能する。`jobProcessor.js` に統合済み。テスト41件全パス。
+- 2026-03-04: タスク6「LLM入力整形レイヤ」実装完了。`promptBuilder.js`（5モード別プロンプト生成純粋関数 + 文字数ベース切り詰めヘルパー）、`llmClient.js`（OpenAI実装済み・Claude未対応スタブ付きモデル抽象化インターフェース、temperature=0で再現性確保）を新規作成。`config.js`（`OPENAI_API_KEY`/`LLM_PROVIDER`/`LLM_MODEL`追加）、`.env.example`、`jobProcessor.js`（buildGraph戻り値保持）を更新。`openai`パッケージ追加。テスト76件全パス。
+- 2026-03-04: タスク7「モード別生成ロジック（5モード）」実装完了。`modeGenerator.js`（5モード並列生成、`Promise.allSettled`で部分失敗吸収）、`modeResultStore.js`（`data/mode-results/<repo>/pr-N.json`に保存）を新規作成。`jobProcessor.js`（`buildGraph`→`generateAllModes`→`saveModeResults`の統合、プロバイダー対応のAPIキー選択）を更新。変更ノードが0件の場合は全モードで「生成不可理由」を返却。テスト83件全パス。

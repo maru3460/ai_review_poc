@@ -1,6 +1,12 @@
 const { GithubClient } = require("./githubClient");
 const { collectPullRequestMetadata } = require("./prMetadataCollector");
 const { savePullRequestMetadata, savePullRequestMetadataFailure } = require("./prMetadataStore");
+const { analyzeStaticGraph } = require("./staticAnalyzer");
+const { saveStaticAnalysis } = require("./staticAnalysisStore");
+const { buildGraph } = require("./graphBuilder");
+const { generateAllModes } = require("./modeGenerator");
+const { saveModeResults } = require("./modeResultStore");
+const { createLlmClient } = require("./llmClient");
 
 function createJobProcessor(config) {
   const githubClient = new GithubClient({
@@ -27,6 +33,28 @@ function createJobProcessor(config) {
         prNumber: job.prNumber
       });
       const outputPath = await savePullRequestMetadata(metadata);
+
+      if (config.openaiApiKey) {
+        const analysis = await analyzeStaticGraph({
+          metadata,
+          openaiApiKey: config.openaiApiKey
+        });
+        await saveStaticAnalysis(analysis);
+
+        const graph = buildGraph({ nodes: analysis.nodes, edges: analysis.edges });
+        const llmClient = createLlmClient({
+          provider: config.llmProvider,
+          apiKey: config.openaiApiKey,
+          model: config.llmModel
+        });
+        const modes = await generateAllModes({ graph, metadata, llmClient });
+        await saveModeResults({
+          repositoryFullName: metadata.repositoryFullName,
+          prNumber: metadata.prNumber,
+          modes
+        });
+      }
+
       return { outputPath };
     } catch (error) {
       await savePullRequestMetadataFailure({

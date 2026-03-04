@@ -29,7 +29,11 @@ function validateEnv(env = process.env) {
     githubBotLogin: env.GITHUB_BOT_LOGIN,
     githubApiBaseUrl: env.GITHUB_API_BASE_URL || "https://api.github.com",
     port,
-    redisUrl: env.REDIS_URL || null
+    redisUrl: env.REDIS_URL || null,
+    // OPENAI_API_KEY は省略可能。未設定時は静的解析・モード生成をスキップする。
+    openaiApiKey: env.OPENAI_API_KEY || null,
+    llmProvider: env.LLM_PROVIDER || "openai",
+    llmModel: env.LLM_MODEL || "gpt-4o-mini"
   };
 }
 
