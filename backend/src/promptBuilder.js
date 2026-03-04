@@ -89,7 +89,8 @@ Return a JSON object with this structure:
   "mermaid": "<mermaid flowchart or sequence diagram as a string>",
   "summary": "<1-2 sentence summary of workflow changes>",
   "highlights": ["<key change 1>", "<key change 2>", ...]
-}`;
+}
+All free-text fields (summary, highlights) must be written in Japanese.`;
 
   const user = `PR Title: ${metadata.prTitle}
 PR Description: ${description || '(none)'}
@@ -132,7 +133,8 @@ Return a JSON object with this structure:
   "edges": [{ "from": "<id>", "to": "<id>", "type": "<call|import|inherit>" }],
   "summary": "<overall impact summary>",
   "highRiskAreas": ["<area 1>", ...]
-}`;
+}
+All free-text fields (summary, highRiskAreas, riskReason) must be written in Japanese.`;
 
   const user = `PR Title: ${metadata.prTitle}
 Files changed: ${metadata.files.length} (additions: ${metadata.lineStats.additions}, deletions: ${metadata.lineStats.deletions})
@@ -173,7 +175,8 @@ Return a JSON object with this structure:
   "sideEffects": ["<side effect description>", ...],
   "summary": "<data flow summary>",
   "mermaid": "<optional Mermaid flowchart of data flow>"
-}`;
+}
+All free-text fields (summary, sideEffects, dataDescription) must be written in Japanese.`;
 
   const user = `PR Title: ${metadata.prTitle}
 PR Description: ${description || '(none)'}
@@ -218,7 +221,8 @@ Return a JSON object with this structure:
   ],
   "summary": "<architecture compliance summary>",
   "overallCompliance": "<compliant|warning|violation>"
-}`;
+}
+All free-text fields (summary, violations description) must be written in Japanese.`;
 
   const user = `PR Title: ${metadata.prTitle}
 Repository: ${metadata.repositoryFullName}
@@ -256,7 +260,8 @@ Return a JSON object with this structure:
   "unrelatedChanges": ["<change that seems unrelated to stated intent>", ...],
   "concerns": ["<concern about intent vs implementation>", ...],
   "reviewFocus": ["<what reviewers should focus on>", ...]
-}`;
+}
+All free-text fields (mainPurpose, implementationSummary, unrelatedChanges, concerns, reviewFocus) must be written in Japanese.`;
 
   const user = `PR Title: ${metadata.prTitle}
 PR Description: ${description || '(none)'}
