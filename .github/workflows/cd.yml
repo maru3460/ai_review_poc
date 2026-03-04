@@ -14,9 +14,10 @@ jobs:
     steps:
       - name: Backend health check
         # Railwayのデプロイ完了を待ちながら /health を最大10分ポーリングする
+        env:
+          BACKEND_URL: ${{ vars.RAILWAY_BACKEND_URL }}
         run: |
           echo "Waiting for Railway backend deployment..."
-          BACKEND_URL="${{ vars.RAILWAY_BACKEND_URL }}"
           if [ -z "$BACKEND_URL" ]; then
             echo "::error::RAILWAY_BACKEND_URL is not set. Add it to repository variables."
             exit 1
@@ -39,8 +40,9 @@ jobs:
           exit 1
 
       - name: Frontend health check
+        env:
+          FRONTEND_URL: ${{ vars.RAILWAY_FRONTEND_URL }}
         run: |
-          FRONTEND_URL="${{ vars.RAILWAY_FRONTEND_URL }}"
           if [ -z "$FRONTEND_URL" ]; then
             echo "::error::RAILWAY_FRONTEND_URL is not set. Add it to repository variables."
             exit 1
@@ -59,10 +61,13 @@ jobs:
 
       - name: Summary
         if: success()
+        env:
+          BACKEND_URL: ${{ vars.RAILWAY_BACKEND_URL }}
+          FRONTEND_URL: ${{ vars.RAILWAY_FRONTEND_URL }}
         run: |
           echo "### ✅ スモークテスト通過" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| サービス | URL |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend | ${{ vars.RAILWAY_BACKEND_URL }}/health |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | ${{ vars.RAILWAY_FRONTEND_URL }}/health |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | ${BACKEND_URL}/health |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${FRONTEND_URL}/health |" >> $GITHUB_STEP_SUMMARY

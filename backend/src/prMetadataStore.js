@@ -38,8 +38,13 @@ async function savePullRequestMetadataFailure({ repositoryFullName, prNumber, de
 
 function buildOutputPath({ repositoryFullName, prNumber, type }) {
   const safeRepositoryName = (repositoryFullName || "unknown-repository").replace(/\//g, "__");
-  const fileName = type === "metadata" ? `pr-${prNumber}.json` : `pr-${prNumber}.failure.json`;
-  return path.join(BASE_DIR, safeRepositoryName, fileName);
+  const safePrNumber = String(parseInt(prNumber, 10));
+  const fileName = type === "metadata" ? `pr-${safePrNumber}.json` : `pr-${safePrNumber}.failure.json`;
+  const outputPath = path.join(BASE_DIR, safeRepositoryName, fileName);
+  if (!outputPath.startsWith(BASE_DIR + path.sep)) {
+    throw new Error(`invalid output path: ${outputPath}`);
+  }
+  return outputPath;
 }
 
 module.exports = {

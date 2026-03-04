@@ -97,6 +97,20 @@ async function analyzeStaticGraph({ metadata, openaiApiKey, _client }) {
 
   const { nodes, edges } = JSON.parse(toolCall.function.arguments);
 
+  // LLM 出力のノード ID を検証して間接プロンプトインジェクションを防ぐ。
+  // 許可形式: "filename" または "filename::symbolName"（英数字・/・.・_・- のみ）
+  const NODE_ID_PATTERN = /^[a-zA-Z0-9_.\/-]+(?:::[a-zA-Z0-9_.\/-]+)?$/;
+  for (const node of nodes || []) {
+    if (!NODE_ID_PATTERN.test(node.id)) {
+      throw new Error(`invalid node id from LLM: "${node.id}"`);
+    }
+  }
+  for (const edge of edges || []) {
+    if (!NODE_ID_PATTERN.test(edge.from) || !NODE_ID_PATTERN.test(edge.to)) {
+      throw new Error(`invalid edge reference from LLM: from="${edge.from}" to="${edge.to}"`);
+    }
+  }
+
   return {
     analyzedAt: new Date().toISOString(),
     repositoryFullName: metadata.repositoryFullName,

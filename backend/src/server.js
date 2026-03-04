@@ -24,35 +24,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "GET" && req.url === "/jobs") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ count: queue.size(), jobs: queue.list() }));
-    return;
-  }
-
   if (req.method === "POST" && req.url === "/webhooks/github") {
     handleGithubWebhook(req, res);
     return;
   }
 
   res.writeHead(200, { "Content-Type": "application/json" });
-  res.end(
-    JSON.stringify({
-      service: "backend",
-      message: "AI review PoC backend is running",
-      githubAppId: config.githubAppId
-    })
-  );
+  res.end(JSON.stringify({ service: "backend", status: "running" }));
 });
+
+const MAX_BODY_SIZE = 1 * 1024 * 1024; // 1MB
 
 function handleGithubWebhook(req, res) {
   const chunks = [];
+  let bodySize = 0;
+  let destroyed = false;
 
   req.on("data", (chunk) => {
+    bodySize += chunk.length;
+    if (bodySize > MAX_BODY_SIZE) {
+      if (!destroyed) {
+        destroyed = true;
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "payload too large" }));
+        req.destroy();
+      }
+      return;
+    }
     chunks.push(chunk);
   });
 
   req.on("end", () => {
+    if (destroyed) return;
     const rawBody = Buffer.concat(chunks);
     const signature = req.headers["x-hub-signature-256"];
     const event = req.headers["x-github-event"];

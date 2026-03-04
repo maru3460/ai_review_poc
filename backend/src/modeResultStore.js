@@ -14,7 +14,11 @@ const BASE_DIR = path.join(__dirname, '..', 'data', 'mode-results');
  */
 async function saveModeResults({ repositoryFullName, prNumber, modes }) {
   const safeRepoName = (repositoryFullName || 'unknown-repository').replace(/\//g, '__');
-  const outputPath = path.join(BASE_DIR, safeRepoName, `pr-${prNumber}.json`);
+  const safePrNumber = String(parseInt(prNumber, 10));
+  const outputPath = path.join(BASE_DIR, safeRepoName, `pr-${safePrNumber}.json`);
+  if (!outputPath.startsWith(BASE_DIR + path.sep)) {
+    throw new Error(`invalid output path: ${outputPath}`);
+  }
 
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(
