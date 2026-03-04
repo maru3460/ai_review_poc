@@ -72,10 +72,15 @@ export function PRVisualizationPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <header className="page-header">
-        <h2>{prMetadata.prTitle}</h2>
+        <div className="page-header-brand">
+          <span className="page-header-logo">⬡</span>
+          <span className="page-header-app">AI Review</span>
+        </div>
+        <div className="page-header-sep" />
+        <h2 className="page-header-title">{prMetadata.prTitle}</h2>
         {prMetadata.prUrl && (
-          <a href={prMetadata.prUrl} target="_blank" rel="noopener noreferrer">
-            {prMetadata.repositoryFullName} #{prNumber}
+          <a href={prMetadata.prUrl} target="_blank" rel="noopener noreferrer" className="page-header-link">
+            {prMetadata.repositoryFullName} #{prNumber} ↗
           </a>
         )}
       </header>

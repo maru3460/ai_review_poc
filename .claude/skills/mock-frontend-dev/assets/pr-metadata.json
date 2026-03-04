@@ -1,0 +1,43 @@
+{
+  "repositoryFullName": "smoke-test/demo-repo",
+  "prNumber": 999,
+  "prTitle": "feat: 認証フローにJWTトークン検証を追加",
+  "prUrl": "https://github.com/smoke-test/demo-repo/pull/999",
+  "headSha": "abc1234567890",
+  "lineStats": {
+    "additions": 87,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "filename": "src/auth/login.js",
+      "status": "modified",
+      "additions": 45,
+      "deletions": 8
+    },
+    {
+      "filename": "src/auth/validateToken.js",
+      "status": "added",
+      "additions": 32,
+      "deletions": 0
+    },
+    {
+      "filename": "src/db/userRepository.js",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 3
+    },
+    {
+      "filename": "src/middleware/authMiddleware.js",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "filename": "tests/auth/login.test.js",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    }
+  ]
+}

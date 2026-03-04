@@ -1,0 +1,160 @@
+{
+  "savedAt": "2026-03-04T00:00:21.265Z",
+  "repositoryFullName": "smoke-test/demo-repo",
+  "prNumber": 999,
+  "modes": {
+    "workflowChange": {
+      "success": true,
+      "data": {
+        "mermaid": "flowchart TD\n    A[ログインリクエスト] -->|呼び出し| B[authenticate]\n    B -->|呼び出し| C[findUser]\n    B -->|呼び出し| D[validateToken]\n    C -->|ユーザー情報を返す| B\n    D -->|トークン検証結果を返す| B\n    B -->|認証結果を返す| E[レスポンス]\n    style A fill:#f9f,stroke:#333,stroke-width:2px;\n    style B fill:#ff0,stroke:#333,stroke-width:2px;\n    style D fill:#0f0,stroke:#333,stroke-width:2px;\n    style C fill:#fff,stroke:#333,stroke-width:2px;\n    style E fill:#fff,stroke:#333,stroke-width:2px;",
+        "summary": "ユーザー認証のワークフローが強化されました。authenticate関数にJWTトークン検証ステップが追加され、既存のユーザー検索処理は維持されています。",
+        "highlights": [
+          "JWTトークンの有効性を確認するvalidateToken関数を追加",
+          "authenticate関数をトークン検証を含む形に修正"
+        ]
+      }
+    },
+    "impactMap": {
+      "success": true,
+      "data": {
+        "impactNodes": [
+          {
+            "id": "src/auth/login.js",
+            "label": "login.js",
+            "changeType": "modified",
+            "riskLevel": "high",
+            "riskReason": "認証メインファイルの変更により、ユーザーログイン機能全体に影響が及ぶ可能性があります。",
+            "distance": 0
+          },
+          {
+            "id": "src/auth/login.js::authenticate",
+            "label": "authenticate",
+            "changeType": "modified",
+            "riskLevel": "high",
+            "riskReason": "authenticate関数の変更はユーザー認証フローに直接影響します。",
+            "distance": 0
+          },
+          {
+            "id": "src/auth/login.js::validateToken",
+            "label": "validateToken",
+            "changeType": "added",
+            "riskLevel": "medium",
+            "riskReason": "新しいトークン検証関数はセキュリティ強化を目的としていますが、新たなエラーパスが生まれる可能性があります。",
+            "distance": 1
+          },
+          {
+            "id": "src/db/userRepository.js",
+            "label": "userRepository.js",
+            "changeType": "unchanged",
+            "riskLevel": "low",
+            "riskReason": "変更はありませんが、認証処理に引き続き関与しています。",
+            "distance": 1
+          },
+          {
+            "id": "src/db/userRepository.js::findUser",
+            "label": "findUser",
+            "changeType": "unchanged",
+            "riskLevel": "low",
+            "riskReason": "変更はありませんが、修正されたauthenticate関数から呼び出されています。",
+            "distance": 1
+          },
+          {
+            "id": "src/middleware/authMiddleware.js",
+            "label": "authMiddleware.js",
+            "changeType": "unchanged",
+            "riskLevel": "low",
+            "riskReason": "変更はありませんが、修正されたauthenticate関数を呼び出しています。",
+            "distance": 1
+          }
+        ],
+        "edges": [
+          { "from": "src/auth/login.js", "to": "src/db/userRepository.js", "type": "import" },
+          { "from": "src/auth/login.js::authenticate", "to": "src/db/userRepository.js::findUser", "type": "call" },
+          { "from": "src/auth/login.js::authenticate", "to": "src/auth/login.js::validateToken", "type": "call" },
+          { "from": "src/middleware/authMiddleware.js", "to": "src/auth/login.js::authenticate", "type": "call" }
+        ],
+        "summary": "変更は主に認証処理に影響しており、新しいトークン検証関数の追加と既存のauthenticate関数の修正が行われています。",
+        "highRiskAreas": ["認証処理", "ユーザーログイン"]
+      }
+    },
+    "dataLineage": {
+      "success": true,
+      "data": {
+        "lineage": [
+          {
+            "from": "src/middleware/authMiddleware.js",
+            "to": "src/auth/login.js::authenticate",
+            "dataDescription": "APIリクエストデータ（認証情報）がauthenticate関数に渡される",
+            "hasSideEffect": false
+          },
+          {
+            "from": "src/auth/login.js::authenticate",
+            "to": "src/auth/login.js::validateToken",
+            "dataDescription": "JWTトークンが検証のためにvalidateToken関数に渡される",
+            "hasSideEffect": false
+          },
+          {
+            "from": "src/auth/login.js::authenticate",
+            "to": "src/db/userRepository.js::findUser",
+            "dataDescription": "ユーザー認証情報がDBからユーザーデータを取得するためfindUser関数に渡される",
+            "hasSideEffect": false
+          },
+          {
+            "from": "src/db/userRepository.js::findUser",
+            "to": "src/auth/login.js::authenticate",
+            "dataDescription": "DBから取得したユーザーデータがauthenticate関数に返される",
+            "hasSideEffect": false
+          }
+        ],
+        "sideEffects": [
+          "JWTトークン検証により、トークンが無効な場合はログイン試行が拒否され認証フローに影響します。"
+        ],
+        "summary": "データフローはauthMiddlewareのAPIリクエストから始まり、authenticate関数が呼び出されます。",
+        "mermaid": "graph TD;\n    A[src/middleware/authMiddleware.js] -->|APIリクエストデータ| B[src/auth/login.js::authenticate];\n    B -->|JWTトークン| C[src/auth/login.js::validateToken];\n    B -->|ユーザー認証情報| D[src/db/userRepository.js::findUser];\n    D -->|ユーザーデータ| B;"
+      }
+    },
+    "architectureCompliance": {
+      "success": true,
+      "data": {
+        "layers": [
+          { "name": "プレゼンテーション層", "nodes": [] },
+          {
+            "name": "ビジネスロジック層",
+            "nodes": ["src/auth/login.js", "src/auth/login.js::authenticate", "src/auth/login.js::validateToken"]
+          },
+          {
+            "name": "データアクセス層",
+            "nodes": ["src/db/userRepository.js", "src/db/userRepository.js::findUser"]
+          },
+          { "name": "ミドルウェア層", "nodes": ["src/middleware/authMiddleware.js"] }
+        ],
+        "violations": [
+          {
+            "from": "src/middleware/authMiddleware.js",
+            "to": "src/auth/login.js::authenticate",
+            "violationType": "cross-layer",
+            "description": "ミドルウェア層がビジネスロジック層の関数を直接呼び出しており、アーキテクチャ境界に違反しています。"
+          }
+        ],
+        "summary": "変更によりビジネスロジック層にトークン検証の新機能が追加されました。",
+        "overallCompliance": "violation"
+      }
+    },
+    "intentContext": {
+      "success": true,
+      "data": {
+        "intentCategory": "feature",
+        "mainPurpose": "ログイン時の認証処理にJWTトークン検証を追加する。",
+        "implementationSummary": "既存のauthenticate関数を修正し、JWTトークンの有効期限と署名を確認する新しいvalidateToken関数を追加。",
+        "alignmentScore": 90,
+        "unrelatedChanges": [],
+        "concerns": [],
+        "reviewFocus": [
+          "validateToken関数がJWTトークンの有効期限と署名を正しく検証しているか確認する",
+          "新しい検証ロジックの統合が既存の認証フローを妨げていないか確認する",
+          "JWT検証追加によるセキュリティへの影響を全体的にレビューする"
+        ]
+      }
+    }
+  }
+}
