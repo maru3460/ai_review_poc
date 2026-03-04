@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
 
-const TARGET_PULL_REQUEST_ACTIONS = new Set(["opened", "synchronize"]);
+const TARGET_PULL_REQUEST_ACTIONS = new Set(["opened", "reopened", "synchronize"]);
 
 function verifySignature(rawBody, signatureHeader, webhookSecret) {
   if (!signatureHeader || !signatureHeader.startsWith("sha256=")) {
