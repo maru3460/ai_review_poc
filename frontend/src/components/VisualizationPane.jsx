@@ -70,22 +70,26 @@ function dataLineageToMermaid(data) {
   if (!data?.lineage?.length) return 'graph TD\n  NoData["データなし"]';
 
   const lines = ['graph LR'];
-  const nodes = new Set();
+  const nodes = new Map(); // safeId -> originalId
 
   for (const item of data.lineage) {
     const fromId = sanitizeMermaidId(item.from);
     const toId = sanitizeMermaidId(item.to);
     if (!nodes.has(fromId)) {
-      nodes.add(fromId);
+      nodes.set(fromId, item.from);
       lines.push(`  ${fromId}["${item.from.slice(0, 30).replace(/"/g, "'")}"]`);
     }
     if (!nodes.has(toId)) {
-      nodes.add(toId);
+      nodes.set(toId, item.to);
       lines.push(`  ${toId}["${item.to.slice(0, 30).replace(/"/g, "'")}"]`);
     }
     const label = (item.dataDescription || item.type || '').slice(0, 20).replace(/"/g, "'");
     const arrow = item.hasSideEffect ? '==>' : '-->';
     lines.push(`  ${fromId} ${arrow}|"${label}"| ${toId}`);
+  }
+
+  for (const [safeId, originalId] of nodes) {
+    lines.push(`  click ${safeId} __mermaidNodeClick__ "${originalId.replace(/"/g, "'")}"`);
   }
 
   return lines.join('\n');
@@ -98,12 +102,14 @@ function architectureToMermaid(data) {
   if (!data?.layers?.length) return 'graph TD\n  NoData["データなし"]';
 
   const lines = ['graph TD'];
+  const nodeMap = new Map(); // safeId -> originalId
 
   for (const layer of data.layers) {
     const safeName = sanitizeMermaidId(layer.name);
     lines.push(`  subgraph ${safeName}["${layer.name}"]`);
     for (const nodeId of (layer.nodes || []).slice(0, 8)) {
       const safeId = sanitizeMermaidId(nodeId);
+      nodeMap.set(safeId, nodeId);
       lines.push(`    ${safeId}["${nodeId.slice(0, 30).replace(/"/g, "'")}"]`);
     }
     lines.push('  end');
@@ -115,7 +121,35 @@ function architectureToMermaid(data) {
     lines.push(`  ${from} -.->|"violation"| ${to}`);
   }
 
+  for (const [safeId, originalId] of nodeMap) {
+    lines.push(`  click ${safeId} __mermaidNodeClick__ "${originalId.replace(/"/g, "'")}"`);
+  }
+
   return lines.join('\n');
+}
+
+/**
+ * LLM生成のMermaid文字列にクリックイベントを注入する。
+ * workflowChangeモード向け。ノードIDは静的解析IDと一致しない場合があり、
+ * その場合は詳細パネルにフォールバック表示がされる。
+ */
+function injectMermaidClicks(mermaidStr) {
+  if (!mermaidStr) return mermaidStr;
+
+  const keywords = new Set(['graph', 'flowchart', 'subgraph', 'end', 'click', 'classDef', 'class', 'style', 'linkStyle', 'direction']);
+  const nodeIds = new Set();
+
+  for (const line of mermaidStr.split('\n')) {
+    const m = line.match(/^\s+([A-Za-z0-9_]+)[\[\(\{]/);
+    if (m && !keywords.has(m[1])) {
+      nodeIds.add(m[1]);
+    }
+  }
+
+  if (nodeIds.size === 0) return mermaidStr;
+
+  const clickLines = Array.from(nodeIds).map((id) => `  click ${id} __mermaidNodeClick__ "${id}"`);
+  return mermaidStr + '\n' + clickLines.join('\n');
 }
 
 /**
@@ -127,7 +161,7 @@ function getMermaidChart(modeKey, modeResult) {
   const d = modeResult.data;
   switch (modeKey) {
     case 'workflowChange':
-      return d?.mermaid || null;
+      return d?.mermaid ? injectMermaidClicks(d.mermaid) : null;
     case 'impactMap':
       return impactMapToMermaid(d);
     case 'dataLineage':

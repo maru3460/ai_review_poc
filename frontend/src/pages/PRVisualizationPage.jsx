@@ -24,7 +24,7 @@ export function PRVisualizationPage() {
   });
 
   // AI解説（非同期・LLMで生成）
-  const { aiExplanation, loading: explainLoading } = useNodeExplain({
+  const { aiExplanation, loading: explainLoading, error: explainError } = useNodeExplain({
     owner, repo, prNumber, nodeId: selectedNodeId
   });
 
@@ -103,6 +103,7 @@ export function PRVisualizationPage() {
             nodeDetailError={nodeDetailError}
             aiExplanation={aiExplanation}
             explainLoading={explainLoading}
+            explainError={explainError}
           />
         }
       />

@@ -3,7 +3,7 @@
  * ノード未選択時はプレースホルダーを表示する。
  * 選択時はコード断片・リスク情報・AI解説を表示する。
  */
-function NodeDetailSection({ selectedNodeId, nodeDetail, nodeDetailLoading, nodeDetailError, aiExplanation, explainLoading }) {
+function NodeDetailSection({ selectedNodeId, nodeDetail, nodeDetailLoading, nodeDetailError, aiExplanation, explainLoading, explainError }) {
   if (!selectedNodeId) {
     return (
       <div className="review-section node-detail-section">
@@ -54,7 +54,10 @@ function NodeDetailSection({ selectedNodeId, nodeDetail, nodeDetailLoading, node
         {!explainLoading && aiExplanation && (
           <p className="ai-explanation">{aiExplanation}</p>
         )}
-        {!explainLoading && !aiExplanation && !nodeDetailLoading && (
+        {!explainLoading && explainError && (
+          <p className="no-data">AI解説取得失敗: {explainError}</p>
+        )}
+        {!explainLoading && !explainError && !aiExplanation && !nodeDetailLoading && (
           <p className="no-data">AI解説なし</p>
         )}
       </div>
@@ -66,7 +69,7 @@ function NodeDetailSection({ selectedNodeId, nodeDetail, nodeDetailLoading, node
  * レビュー情報ペイン（右ペイン）。
  * 上部にノード詳細（選択時）、下部にPR全体の要約・レビュー観点・リスク注釈を表示する。
  */
-export function ReviewInfoPane({ modes, selectedNodeId, nodeDetail, nodeDetailLoading, nodeDetailError, aiExplanation, explainLoading }) {
+export function ReviewInfoPane({ modes, selectedNodeId, nodeDetail, nodeDetailLoading, nodeDetailError, aiExplanation, explainLoading, explainError }) {
   const intentData = modes?.intentContext?.success ? modes.intentContext.data : null;
   const impactData = modes?.impactMap?.success ? modes.impactMap.data : null;
   const archData = modes?.architectureCompliance?.success ? modes.architectureCompliance.data : null;
@@ -92,6 +95,7 @@ export function ReviewInfoPane({ modes, selectedNodeId, nodeDetail, nodeDetailLo
         nodeDetailError={nodeDetailError}
         aiExplanation={aiExplanation}
         explainLoading={explainLoading}
+        explainError={explainError}
       />
 
       {/* 3行要約 */}
