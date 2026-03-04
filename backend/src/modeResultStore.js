@@ -29,4 +29,20 @@ async function saveModeResults({ repositoryFullName, prNumber, modes }) {
   return outputPath;
 }
 
-module.exports = { saveModeResults };
+async function getModeResults({ repositoryFullName, prNumber }) {
+  const safeRepoName = (repositoryFullName || 'unknown-repository').replace(/\//g, '__');
+  const safePrNumber = String(parseInt(prNumber, 10));
+  const outputPath = path.join(BASE_DIR, safeRepoName, `pr-${safePrNumber}.json`);
+  if (!outputPath.startsWith(BASE_DIR + path.sep)) {
+    throw new Error(`invalid output path: ${outputPath}`);
+  }
+  try {
+    const json = await fs.readFile(outputPath, 'utf8');
+    return JSON.parse(json);
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+module.exports = { saveModeResults, getModeResults };

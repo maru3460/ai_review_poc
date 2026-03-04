@@ -29,8 +29,8 @@
 - [x] 5. 依存グラフ/呼び出しグラフ生成
 - [x] 6. LLM入力整形レイヤ
 - [x] 7. モード別生成ロジック（5モード）
-- [ ] 8. 可視化ページAPI
-- [ ] 9. 3ペインUI実装
+- [x] 8. 可視化ページAPI
+- [x] 9. 3ペインUI実装
 - [ ] 10. モード切替UX実装
 - [ ] 11. ノード詳細連動（コード断片 + AI解説）
 - [ ] 12. PRコメント投稿
@@ -294,3 +294,5 @@
 - 2026-03-04: タスク5「依存グラフ/呼び出しグラフ生成」実装完了。`graphBuilder.js`（BFSベースのトラバーサル）を新規作成。`buildGraph({ nodes, edges })` が `getChangedNodes` / `getNeighbors` / `extractSubgraph(startNodeId, maxDepth)` / `extractChangedSubgraph(maxDepth)` を持つグラフオブジェクトを返す。双方向トラバーサル対応、サイクル耐性あり、Workflow用maxDepth=3制限が機能する。`jobProcessor.js` に統合済み。テスト41件全パス。
 - 2026-03-04: タスク6「LLM入力整形レイヤ」実装完了。`promptBuilder.js`（5モード別プロンプト生成純粋関数 + 文字数ベース切り詰めヘルパー）、`llmClient.js`（OpenAI実装済み・Claude未対応スタブ付きモデル抽象化インターフェース、temperature=0で再現性確保）を新規作成。`config.js`（`OPENAI_API_KEY`/`LLM_PROVIDER`/`LLM_MODEL`追加）、`.env.example`、`jobProcessor.js`（buildGraph戻り値保持）を更新。`openai`パッケージ追加。テスト76件全パス。
 - 2026-03-04: タスク7「モード別生成ロジック（5モード）」実装完了。`modeGenerator.js`（5モード並列生成、`Promise.allSettled`で部分失敗吸収）、`modeResultStore.js`（`data/mode-results/<repo>/pr-N.json`に保存）を新規作成。`jobProcessor.js`（`buildGraph`→`generateAllModes`→`saveModeResults`の統合、プロバイダー対応のAPIキー選択）を更新。変更ノードが0件の場合は全モードで「生成不可理由」を返却。テスト83件全パス。
+- 2026-03-04: タスク8「可視化ページAPI」実装完了。`server.js` に `/api/prs/:owner/:repo/:prNumber/visualization`（5モード統合データ）、`/status`（ジョブ進捗）、`/nodes`（ノード詳細・隣接ノード・リスク情報・ファイル内容）の3エンドポイントを実装。CORS対応済み。
+- 2026-03-04: タスク9「3ペインUI実装」実装完了。Vite + React + react-router-dom + mermaid でフロントエンドを構築。`/prs/:owner/:repo/:prNumber` でPR可視化ページにアクセス。左ペイン（変更ファイルツリー）、中央ペイン（Mermaid図 + 5モードタブ + ズーム/パン）、右ペイン（3行要約・レビュー観点・リスク注釈）の3ペインレイアウトを実装。ポーリングによる処理待ち対応。`frontend/src/server.js` を静的ファイルサーバー（SPA fallback付き）に更新。`railway.toml` にビルドコマンドを追加。

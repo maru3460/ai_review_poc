@@ -1,15 +1,6 @@
 // PORT: Railwayは自動でPORTを注入する。ローカル開発ではFRONTEND_PORTを使用する。
-const REQUIRED_ENV_VARS = ["BACKEND_BASE_URL"];
-
+// VITE_BACKEND_BASE_URL はビルド時にViteが埋め込むため、ここではチェックしない。
 function validateEnv(env = process.env) {
-  const missing = REQUIRED_ENV_VARS.filter((name) => !env[name] || env[name].trim() === "");
-
-  if (missing.length > 0) {
-    throw new Error(
-      `Missing required environment variables: ${missing.join(", ")}. See frontend/.env.example.`
-    );
-  }
-
   const port = Number(env.PORT || env.FRONTEND_PORT);
   if (!port) {
     throw new Error(
@@ -17,10 +8,7 @@ function validateEnv(env = process.env) {
     );
   }
 
-  return {
-    port,
-    backendBaseUrl: env.BACKEND_BASE_URL
-  };
+  return { port };
 }
 
 module.exports = {

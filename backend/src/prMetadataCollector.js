@@ -19,6 +19,8 @@ async function collectPullRequestMetadata({ githubClient, repositoryFullName, pr
     collectedAt: new Date().toISOString(),
     repositoryFullName,
     prNumber,
+    headSha: prResponse.data.head.sha || "",
+    headRef: prResponse.data.head.ref || "",
     prTitle: prResponse.data.title || "",
     prDescription: prResponse.data.body || "",
     prUrl: prResponse.data.html_url || "",

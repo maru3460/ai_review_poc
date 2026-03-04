@@ -47,7 +47,31 @@ function buildOutputPath({ repositoryFullName, prNumber, type }) {
   return outputPath;
 }
 
+async function getPrMetadata({ repositoryFullName, prNumber }) {
+  const outputPath = buildOutputPath({ repositoryFullName, prNumber, type: "metadata" });
+  try {
+    const json = await fs.readFile(outputPath, "utf8");
+    return JSON.parse(json);
+  } catch (err) {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+async function getPrMetadataFailure({ repositoryFullName, prNumber }) {
+  const outputPath = buildOutputPath({ repositoryFullName, prNumber, type: "failure" });
+  try {
+    const json = await fs.readFile(outputPath, "utf8");
+    return JSON.parse(json);
+  } catch (err) {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  }
+}
+
 module.exports = {
   savePullRequestMetadata,
-  savePullRequestMetadataFailure
+  savePullRequestMetadataFailure,
+  getPrMetadata,
+  getPrMetadataFailure
 };

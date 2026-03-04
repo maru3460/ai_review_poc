@@ -4,6 +4,10 @@ const { validateEnv } = require("./config");
 const { InMemoryJobQueue } = require("./jobQueue");
 const { verifySignature, isTargetEvent, buildJobFromPayload } = require("./githubWebhook");
 const { createJobProcessor } = require("./jobProcessor");
+const { GithubClient } = require("./githubClient");
+const { getModeResults } = require("./modeResultStore");
+const { getStaticAnalysis } = require("./staticAnalysisStore");
+const { getPrMetadata, getPrMetadataFailure } = require("./prMetadataStore");
 
 let config;
 
@@ -16,6 +20,10 @@ try {
 
 const queue = new InMemoryJobQueue();
 const processJob = createJobProcessor(config);
+const githubClient = new GithubClient({
+  token: config.githubToken,
+  apiBaseUrl: config.githubApiBaseUrl
+});
 
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") {
@@ -26,6 +34,22 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && req.url === "/webhooks/github") {
     handleGithubWebhook(req, res);
+    return;
+  }
+
+  const parsedUrl = new URL(req.url, "http://localhost");
+  const apiMatch = parsedUrl.pathname.match(
+    /^\/api\/prs\/([^/]+)\/([^/]+)\/(\d+)\/(visualization|status|nodes)$/
+  );
+  if (req.method === "GET" && apiMatch) {
+    const [, owner, repo, prNumber, endpoint] = apiMatch;
+    handleVisualizationApi(req, res, {
+      owner,
+      repo,
+      prNumber,
+      endpoint,
+      searchParams: parsedUrl.searchParams
+    });
     return;
   }
 
@@ -114,6 +138,138 @@ function handleGithubWebhook(req, res) {
     res.writeHead(202, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "queued", deliveryId }));
   });
+}
+
+const CORS_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*"
+};
+
+async function handleVisualizationApi(req, res, { owner, repo, prNumber, endpoint, searchParams }) {
+  const repositoryFullName = `${owner}/${repo}`;
+
+  try {
+    if (endpoint === "visualization") {
+      const [modeResults, prMetadata] = await Promise.all([
+        getModeResults({ repositoryFullName, prNumber }),
+        getPrMetadata({ repositoryFullName, prNumber })
+      ]);
+
+      if (modeResults === null) {
+        res.writeHead(404, CORS_HEADERS);
+        res.end(JSON.stringify({ error: "not_ready" }));
+        return;
+      }
+      if (prMetadata === null) {
+        res.writeHead(404, CORS_HEADERS);
+        res.end(JSON.stringify({ error: "not_found" }));
+        return;
+      }
+
+      res.writeHead(200, CORS_HEADERS);
+      res.end(JSON.stringify({ prMetadata, modes: modeResults.modes }));
+      return;
+    }
+
+    if (endpoint === "status") {
+      const [modeResults, prMetadata, prMetadataFailure] = await Promise.all([
+        getModeResults({ repositoryFullName, prNumber }),
+        getPrMetadata({ repositoryFullName, prNumber }),
+        getPrMetadataFailure({ repositoryFullName, prNumber })
+      ]);
+
+      if (modeResults !== null) {
+        res.writeHead(200, CORS_HEADERS);
+        res.end(JSON.stringify({ status: "completed" }));
+        return;
+      }
+      if (prMetadata !== null) {
+        res.writeHead(200, CORS_HEADERS);
+        res.end(JSON.stringify({ status: "processing" }));
+        return;
+      }
+      if (prMetadataFailure !== null) {
+        res.writeHead(200, CORS_HEADERS);
+        res.end(JSON.stringify({ status: "failed", reason: prMetadataFailure.errorMessage }));
+        return;
+      }
+      res.writeHead(200, CORS_HEADERS);
+      res.end(JSON.stringify({ status: "not_found" }));
+      return;
+    }
+
+    if (endpoint === "nodes") {
+      const nodeId = searchParams.get("id");
+      const [staticAnalysis, modeResults, prMetadata] = await Promise.all([
+        getStaticAnalysis({ repositoryFullName, prNumber }),
+        getModeResults({ repositoryFullName, prNumber }),
+        getPrMetadata({ repositoryFullName, prNumber })
+      ]);
+
+      if (!staticAnalysis) {
+        res.writeHead(404, CORS_HEADERS);
+        res.end(JSON.stringify({ error: "not_found" }));
+        return;
+      }
+
+      const nodes = staticAnalysis.nodes || [];
+      const edges = staticAnalysis.edges || [];
+      const targetNode = nodes.find((n) => n.id === nodeId);
+
+      if (!targetNode) {
+        res.writeHead(404, CORS_HEADERS);
+        res.end(JSON.stringify({ error: "node_not_found" }));
+        return;
+      }
+
+      const neighbors = edges
+        .filter((e) => e.from === nodeId || e.to === nodeId)
+        .map((e) => {
+          const neighborId = e.from === nodeId ? e.to : e.from;
+          const neighborNode = nodes.find((n) => n.id === neighborId) || { id: neighborId };
+          return { node: neighborNode, edge: e };
+        });
+
+      let riskLevel = null;
+      let riskReason = null;
+      if (modeResults && modeResults.modes && modeResults.modes.impactMap) {
+        const impactNodes = modeResults.modes.impactMap.data?.impactNodes || [];
+        const impactNode = impactNodes.find((n) => n.id === nodeId);
+        if (impactNode) {
+          riskLevel = impactNode.riskLevel || null;
+          riskReason = impactNode.riskReason || null;
+        }
+      }
+
+      let fileContent = null;
+      if (prMetadata && prMetadata.headSha && targetNode.module) {
+        const { owner: repoOwner, repo: repoName } = splitOwnerRepo(repositoryFullName);
+        try {
+          const contentRes = await githubClient.get(
+            `/repos/${repoOwner}/${repoName}/contents/${targetNode.module}?ref=${prMetadata.headSha}`
+          );
+          if (contentRes.data && contentRes.data.content) {
+            fileContent = Buffer.from(contentRes.data.content, "base64").toString("utf8");
+          }
+        } catch {
+          // GitHub API エラー時はfileContentをnullのまま返す
+        }
+      }
+
+      res.writeHead(200, CORS_HEADERS);
+      res.end(JSON.stringify({ node: targetNode, neighbors, riskLevel, riskReason, fileContent }));
+      return;
+    }
+  } catch (err) {
+    console.error(`[error] visualization api error: ${err.message}`);
+    res.writeHead(500, CORS_HEADERS);
+    res.end(JSON.stringify({ error: "internal_error" }));
+  }
+}
+
+function splitOwnerRepo(repositoryFullName) {
+  const [owner, repo] = repositoryFullName.split("/");
+  return { owner, repo };
 }
 
 server.listen(config.port, () => {

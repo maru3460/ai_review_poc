@@ -39,7 +39,8 @@ test("collectPullRequestMetadata returns expected shape", async () => {
           data: {
             title: "Improve parser",
             body: "This PR updates parsing logic.",
-            html_url: "https://github.com/org/repo/pull/10"
+            html_url: "https://github.com/org/repo/pull/10",
+            head: { sha: "abc123", ref: "feature/parser" }
           }
         };
       }
@@ -69,6 +70,8 @@ test("collectPullRequestMetadata returns expected shape", async () => {
 
   assert.equal(result.repositoryFullName, "org/repo");
   assert.equal(result.prNumber, 10);
+  assert.equal(result.headSha, "abc123");
+  assert.equal(result.headRef, "feature/parser");
   assert.equal(result.prTitle, "Improve parser");
   assert.equal(result.prDescription, "This PR updates parsing logic.");
   assert.equal(result.lineStats.additions, 7);

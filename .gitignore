@@ -6,6 +6,9 @@ frontend/.env
 # 生成データ
 backend/data/
 
+# ビルド成果物
+frontend/dist/
+
 # 依存パッケージ
 node_modules/
 backend/node_modules/

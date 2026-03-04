@@ -1,0 +1,487 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #333;
+  background: #f0f2f5;
+  height: 100vh;
+  overflow: hidden;
+}
+
+code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  background: #f0f0f0;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+/* ステータス画面 */
+.status-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 12px;
+  color: #555;
+}
+
+.status-screen.error {
+  color: #d32f2f;
+}
+
+.status-screen h2 {
+  font-size: 20px;
+  color: #333;
+}
+
+/* スピナー */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #1976d2;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ページヘッダー */
+.page-header {
+  height: 48px;
+  padding: 0 16px;
+  background: #1976d2;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.page-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50%;
+}
+
+.page-header a {
+  color: rgba(255,255,255,0.8);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.page-header a:hover {
+  color: #fff;
+}
+
+/* 3ペインレイアウト */
+.three-pane-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr 280px;
+  height: calc(100vh - 48px);
+  overflow: hidden;
+}
+
+.pane {
+  overflow-y: auto;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+}
+
+.pane-center {
+  overflow: hidden;
+  border-right: none;
+  background: #fafafa;
+}
+
+.pane-right {
+  border-right: none;
+  border-left: 1px solid #e0e0e0;
+}
+
+/* ペインヘッダー */
+.pane-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fafafa;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.pane-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ファイルツリーペイン */
+.file-tree-pane {
+  height: 100%;
+}
+
+.pr-summary {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.pr-summary .pr-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pr-summary .pr-stats {
+  font-size: 11px;
+  color: #888;
+}
+
+.dir-group {
+  margin-top: 4px;
+}
+
+.dir-name {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: #888;
+  font-weight: 600;
+  background: #f5f5f5;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 20px;
+  cursor: default;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.file-item:hover {
+  background: #f5f5f5;
+}
+
+.file-status-icon {
+  font-size: 11px;
+  font-weight: 700;
+  width: 14px;
+  text-align: center;
+}
+
+.file-item.added .file-status-icon { color: #2e7d32; }
+.file-item.removed .file-status-icon { color: #c62828; }
+.file-item.modified .file-status-icon { color: #e65100; }
+.file-item.renamed .file-status-icon { color: #1565c0; }
+
+.file-name {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-stats {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+}
+
+/* 可視化ペイン */
+.visualization-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mode-tabs {
+  display: flex;
+  border-bottom: 2px solid #e0e0e0;
+  background: #fff;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.mode-tab {
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.mode-tab:hover {
+  color: #1976d2;
+}
+
+.mode-tab.active {
+  color: #1976d2;
+  border-bottom-color: #1976d2;
+}
+
+.mode-tab.failed {
+  color: #bbb;
+}
+
+/* ズーム/パンコンテナ */
+.zoom-pan-outer {
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  position: relative;
+  user-select: none;
+}
+
+.zoom-pan-outer:active {
+  cursor: grabbing;
+}
+
+.zoom-pan-inner {
+  transform-origin: 0 0;
+  display: inline-block;
+  min-width: 100%;
+  min-height: 100%;
+  padding: 24px;
+}
+
+.zoom-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10;
+}
+
+.zoom-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.zoom-btn:hover {
+  background: #f5f5f5;
+}
+
+/* Mermaid */
+.mermaid-container svg {
+  max-width: none;
+}
+
+/* Intent/Context テキスト表示 */
+.intent-context-view {
+  padding: 16px;
+  max-width: 700px;
+}
+
+.intent-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #e3f2fd;
+  color: #1565c0;
+  margin-bottom: 12px;
+}
+
+.intent-section {
+  margin-bottom: 16px;
+}
+
+.intent-section h4 {
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.intent-section p {
+  font-size: 13px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.alignment-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alignment-track {
+  flex: 1;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.alignment-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #4caf50;
+  transition: width 0.3s;
+}
+
+.intent-list {
+  list-style: none;
+  padding: 0;
+}
+
+.intent-list li {
+  font-size: 12px;
+  color: #555;
+  padding: 3px 0;
+  padding-left: 14px;
+  position: relative;
+  line-height: 1.4;
+}
+
+.intent-list li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #1976d2;
+}
+
+/* モード失敗表示 */
+.mode-failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 13px;
+  padding: 24px;
+  text-align: center;
+}
+
+/* レビュー情報ペイン */
+.review-info-pane {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.review-section {
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.review-section h4 {
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.summary-item {
+  margin-bottom: 6px;
+}
+
+.summary-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+}
+
+.summary-text {
+  font-size: 12px;
+  color: #444;
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+.review-focus-list {
+  list-style: none;
+  padding: 0;
+}
+
+.review-focus-list li {
+  font-size: 12px;
+  color: #444;
+  padding: 4px 0;
+  padding-left: 16px;
+  position: relative;
+  line-height: 1.4;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.review-focus-list li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: #1976d2;
+  font-size: 10px;
+}
+
+.risk-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.risk-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.risk-badge.high { background: #ffebee; color: #c62828; }
+.risk-badge.medium { background: #fff3e0; color: #e65100; }
+.risk-badge.low { background: #e8f5e9; color: #2e7d32; }
+
+.risk-text {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.4;
+}
+
+.no-data {
+  font-size: 12px;
+  color: #bbb;
+  padding: 4px 0;
+}
