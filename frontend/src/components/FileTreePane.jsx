@@ -45,9 +45,9 @@ export function FileTreePane({ files, prMetadata }) {
         <div className="pr-title">{prMetadata?.prTitle || '—'}</div>
         <div className="pr-stats">
           {files?.length ?? 0} ファイル &nbsp;
-          <span style={{ color: '#2e7d32' }}>+{totalAdditions}</span>
+          <span style={{ color: '#4ade80' }}>+{totalAdditions}</span>
           {' '}
-          <span style={{ color: '#c62828' }}>-{totalDeletions}</span>
+          <span style={{ color: '#f87171' }}>-{totalDeletions}</span>
         </div>
       </div>
 
@@ -59,8 +59,8 @@ export function FileTreePane({ files, prMetadata }) {
               <span className="file-status-icon">{statusIcon(file.status)}</span>
               <span className="file-name" title={file.filename}>{file.name}</span>
               <span className="file-stats">
-                {file.additions > 0 && <span style={{ color: '#2e7d32' }}>+{file.additions}</span>}
-                {file.deletions > 0 && <span style={{ color: '#c62828' }}> -{file.deletions}</span>}
+                {file.additions > 0 && <span style={{ color: '#4ade80' }}>+{file.additions}</span>}
+                {file.deletions > 0 && <span style={{ color: '#f87171' }}> -{file.deletions}</span>}
               </span>
             </div>
           ))}

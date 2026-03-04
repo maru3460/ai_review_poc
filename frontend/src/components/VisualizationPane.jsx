@@ -1,7 +1,38 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import mermaid from 'mermaid';
 
-mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+// workflowChange（LLM生成）以外のモード用: ダークノード
+const MERMAID_BASE = {
+  startOnLoad: false,
+  theme: 'base',
+  themeVariables: {
+    background: '#0b1018',
+    primaryColor: '#1e2840',
+    primaryTextColor: '#e8eeff',
+    primaryBorderColor: '#304265',
+    lineColor: '#4a5c7a',
+    secondaryColor: '#161d2e',
+    tertiaryColor: '#1e2840',
+    edgeLabelBackground: '#101622',
+    clusterBkg: '#161d2e',
+    clusterBorder: '#304265',
+    titleColor: '#e8eeff',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  securityLevel: 'loose',
+};
+
+// workflowChange専用: ノード塗りを明るくする（テキスト色はCSS側で制御）
+const MERMAID_WORKFLOW = {
+  ...MERMAID_BASE,
+  themeVariables: {
+    ...MERMAID_BASE.themeVariables,
+    primaryColor: '#e8f5f2',
+    primaryBorderColor: '#00c9a7',
+  },
+};
+
+mermaid.initialize(MERMAID_BASE);
 
 // Mermaid click DSL から呼ばれるグローバルコールバック。
 // VisualizationPane の onNodeClick を登録・解除して使う。
@@ -177,13 +208,16 @@ function getMermaidChart(modeKey, modeResult) {
 
 /**
  * Mermaidダイアグラムをレンダリングするコンポーネント。
+ * workflowChangeのみ明るいノードテーマを使用（LLM生成テキストの可読性確保）。
  */
-function MermaidDiagram({ chart }) {
+function MermaidDiagram({ chart, mode }) {
   const containerRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current || !chart) return;
     let cancelled = false;
+
+    mermaid.initialize(mode === 'workflowChange' ? MERMAID_WORKFLOW : MERMAID_BASE);
 
     const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     mermaid
@@ -202,7 +236,7 @@ function MermaidDiagram({ chart }) {
     return () => { cancelled = true; };
   }, [chart]);
 
-  return <div ref={containerRef} className="mermaid-container" />;
+  return <div ref={containerRef} className={`mermaid-container${mode === 'workflowChange' ? ' mermaid-workflow' : ''}`} />;
 }
 
 /**
@@ -418,7 +452,7 @@ export function VisualizationPane({ modes, activeMode, onModeChange, onNodeClick
           transform={transforms[activeMode]}
           onTransformChange={handleTransformChange}
         >
-          <MermaidDiagram chart={chart} />
+          <MermaidDiagram chart={chart} mode={activeMode} />
         </ZoomPanContainer>
       ) : (
         <div className="mode-failed">描画データなし</div>
