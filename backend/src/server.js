@@ -5,6 +5,7 @@ const { InMemoryJobQueue } = require("./jobQueue");
 const { verifySignature, isTargetEvent, buildJobFromPayload } = require("./githubWebhook");
 const { createJobProcessor } = require("./jobProcessor");
 const { GithubClient } = require("./githubClient");
+const { createLlmClient } = require("./llmClient");
 const { getModeResults } = require("./modeResultStore");
 const { getStaticAnalysis } = require("./staticAnalysisStore");
 const { getPrMetadata, getPrMetadataFailure } = require("./prMetadataStore");
@@ -25,6 +26,19 @@ const githubClient = new GithubClient({
   apiBaseUrl: config.githubApiBaseUrl
 });
 
+// AI解説のインメモリキャッシュ（key: "owner/repo/prNumber::nodeId"）
+const explanationCache = new Map();
+
+// LLMクライアントのシングルトン（OPENAI_API_KEY が設定されている場合のみ生成）
+let llmClient = null;
+if (config.openaiApiKey) {
+  llmClient = createLlmClient({
+    provider: config.llmProvider,
+    apiKey: config.openaiApiKey,
+    model: config.llmModel
+  });
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -39,7 +53,7 @@ const server = http.createServer((req, res) => {
 
   const parsedUrl = new URL(req.url, "http://localhost");
   const apiMatch = parsedUrl.pathname.match(
-    /^\/api\/prs\/([^/]+)\/([^/]+)\/(\d+)\/(visualization|status|nodes)$/
+    /^\/api\/prs\/([^/]+)\/([^/]+)\/(\d+)\/(visualization|status|nodes\/explain|nodes)$/
   );
   if (req.method === "GET" && apiMatch) {
     const [, owner, repo, prNumber, endpoint] = apiMatch;
@@ -256,8 +270,88 @@ async function handleVisualizationApi(req, res, { owner, repo, prNumber, endpoin
         }
       }
 
+      let codeSnippet = null;
+      if (fileContent) {
+        if (nodeId.includes("::")) {
+          const symbolName = nodeId.split("::").slice(1).join("::");
+          codeSnippet = extractSymbolSnippet(fileContent, symbolName);
+        } else {
+          // ファイルノードは先頭3000文字を断片として返す
+          codeSnippet = fileContent.slice(0, 3000);
+        }
+      }
+
       res.writeHead(200, CORS_HEADERS);
-      res.end(JSON.stringify({ node: targetNode, neighbors, riskLevel, riskReason, fileContent }));
+      res.end(JSON.stringify({ node: targetNode, neighbors, riskLevel, riskReason, fileContent, codeSnippet }));
+      return;
+    }
+
+    if (endpoint === "nodes/explain") {
+      const nodeId = searchParams.get("id");
+      const cacheKey = `${repositoryFullName}/${prNumber}::${nodeId}`;
+
+      if (explanationCache.has(cacheKey)) {
+        res.writeHead(200, CORS_HEADERS);
+        res.end(JSON.stringify({ aiExplanation: explanationCache.get(cacheKey) }));
+        return;
+      }
+
+      const [staticAnalysis, prMetadata] = await Promise.all([
+        getStaticAnalysis({ repositoryFullName, prNumber }),
+        getPrMetadata({ repositoryFullName, prNumber })
+      ]);
+
+      if (!staticAnalysis) {
+        res.writeHead(404, CORS_HEADERS);
+        res.end(JSON.stringify({ error: "not_found" }));
+        return;
+      }
+
+      const nodes = staticAnalysis.nodes || [];
+      const targetNode = nodes.find((n) => n.id === nodeId);
+
+      if (!targetNode) {
+        res.writeHead(404, CORS_HEADERS);
+        res.end(JSON.stringify({ error: "node_not_found" }));
+        return;
+      }
+
+      // コード断片を取得してLLMへ渡す
+      let codeSnippet = null;
+      if (prMetadata && prMetadata.headSha && targetNode.module) {
+        const { owner: repoOwner, repo: repoName } = splitOwnerRepo(repositoryFullName);
+        try {
+          const contentRes = await githubClient.get(
+            `/repos/${repoOwner}/${repoName}/contents/${targetNode.module}?ref=${prMetadata.headSha}`
+          );
+          if (contentRes.data && contentRes.data.content) {
+            const fileContent = Buffer.from(contentRes.data.content, "base64").toString("utf8");
+            if (nodeId.includes("::")) {
+              const symbolName = nodeId.split("::").slice(1).join("::");
+              codeSnippet = extractSymbolSnippet(fileContent, symbolName);
+            } else {
+              codeSnippet = fileContent.slice(0, 3000);
+            }
+          }
+        } catch {
+          // GitHub API エラー時はcodeSnippetをnullのまま
+        }
+      }
+
+      let aiExplanation = null;
+      if (llmClient && codeSnippet) {
+        try {
+          const systemPrompt = "あなたはコードレビュー支援AIです。与えられたコードを3行以内で簡潔に日本語で解説してください。";
+          const userPrompt = `以下のコードを3行で説明してください:\n\n${codeSnippet.slice(0, 2000)}`;
+          aiExplanation = await llmClient.complete({ system: systemPrompt, user: userPrompt });
+          explanationCache.set(cacheKey, aiExplanation);
+        } catch {
+          // LLM エラー時はaiExplanationをnullのまま返す
+        }
+      }
+
+      res.writeHead(200, CORS_HEADERS);
+      res.end(JSON.stringify({ aiExplanation }));
       return;
     }
   } catch (err) {
@@ -270,6 +364,44 @@ async function handleVisualizationApi(req, res, { owner, repo, prNumber, endpoin
 function splitOwnerRepo(repositoryFullName) {
   const [owner, repo] = repositoryFullName.split("/");
   return { owner, repo };
+}
+
+/**
+ * ファイル全文からシンボル（関数/クラス）のコード断片を抽出する。
+ * シンボル名を含む定義行から始まり、インデントが元のレベルに戻るまでを返す。
+ * 見つからない場合はnullを返す。
+ *
+ * @param {string} fileContent
+ * @param {string} symbolName
+ * @returns {string|null}
+ */
+function extractSymbolSnippet(fileContent, symbolName) {
+  const lines = fileContent.split("\n");
+  const definitionPattern = /\b(function|class|def|async\s+function|const\s+\w+\s*=|private|public|protected|static)\b/;
+
+  const startIdx = lines.findIndex(
+    (line) => line.includes(symbolName) && definitionPattern.test(line)
+  );
+  if (startIdx === -1) return null;
+
+  const baseIndent = lines[startIdx].match(/^(\s*)/)[1].length;
+  const MAX_LINES = 100;
+  let endIdx = startIdx + 1;
+  let foundBody = false;
+
+  while (endIdx < lines.length && endIdx - startIdx < MAX_LINES) {
+    const trimmed = lines[endIdx].trim();
+    if (trimmed === "") { endIdx++; continue; }
+    const indent = lines[endIdx].match(/^(\s*)/)[1].length;
+    if (!foundBody && indent > baseIndent) { foundBody = true; }
+    if (foundBody && indent <= baseIndent && trimmed !== "") {
+      endIdx++; // 閉じ括弧行を含めて終了する
+      break;
+    }
+    endIdx++;
+  }
+
+  return lines.slice(startIdx, endIdx).join("\n");
 }
 
 server.listen(config.port, () => {

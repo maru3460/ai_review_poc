@@ -5,6 +5,8 @@ import { FileTreePane } from '../components/FileTreePane';
 import { VisualizationPane } from '../components/VisualizationPane';
 import { ReviewInfoPane } from '../components/ReviewInfoPane';
 import { usePRVisualization } from '../hooks/usePRVisualization';
+import { useNodeDetail } from '../hooks/useNodeDetail';
+import { useNodeExplain } from '../hooks/useNodeExplain';
 
 /**
  * PR可視化ページ。
@@ -13,7 +15,18 @@ import { usePRVisualization } from '../hooks/usePRVisualization';
 export function PRVisualizationPage() {
   const { owner, repo, prNumber } = useParams();
   const [activeMode, setActiveMode] = useState('workflowChange');
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
   const { data, status, error } = usePRVisualization({ owner, repo, prNumber });
+
+  // ノード詳細（コード断片・隣接ノード・リスク情報）
+  const { data: nodeDetail, loading: nodeDetailLoading, error: nodeDetailError } = useNodeDetail({
+    owner, repo, prNumber, nodeId: selectedNodeId
+  });
+
+  // AI解説（非同期・LLMで生成）
+  const { aiExplanation, loading: explainLoading } = useNodeExplain({
+    owner, repo, prNumber, nodeId: selectedNodeId
+  });
 
   if (status === 'loading') {
     return (
@@ -78,10 +91,19 @@ export function PRVisualizationPage() {
             modes={modes}
             activeMode={activeMode}
             onModeChange={setActiveMode}
+            onNodeClick={setSelectedNodeId}
           />
         }
         right={
-          <ReviewInfoPane modes={modes} />
+          <ReviewInfoPane
+            modes={modes}
+            selectedNodeId={selectedNodeId}
+            nodeDetail={nodeDetail}
+            nodeDetailLoading={nodeDetailLoading}
+            nodeDetailError={nodeDetailError}
+            aiExplanation={aiExplanation}
+            explainLoading={explainLoading}
+          />
         }
       />
     </div>

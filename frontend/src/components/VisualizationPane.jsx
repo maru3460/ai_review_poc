@@ -3,6 +3,13 @@ import mermaid from 'mermaid';
 
 mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
 
+// Mermaid click DSL から呼ばれるグローバルコールバック。
+// VisualizationPane の onNodeClick を登録・解除して使う。
+let _globalNodeClickCallback = null;
+window.__mermaidNodeClick__ = (rawId) => {
+  if (_globalNodeClickCallback) _globalNodeClickCallback(rawId);
+};
+
 const MODE_LABELS = {
   workflowChange: 'Workflow Change',
   impactMap: 'Impact Map',
@@ -22,11 +29,17 @@ function sanitizeMermaidId(id) {
 
 /**
  * ImpactMapデータ（impactNodes + edges）をMermaid flowchartに変換する。
+ * changeType（added/modified/deleted）をclassDefで色分けする。
  */
 function impactMapToMermaid(data) {
   if (!data?.impactNodes?.length) return 'graph TD\n  NoData["データなし"]';
 
-  const lines = ['graph TD'];
+  const lines = [
+    'graph TD',
+    '  classDef added fill:#c8e6c9,stroke:#388e3c,color:#1b5e20',
+    '  classDef modified fill:#fff3e0,stroke:#f57c00,color:#bf360c',
+    '  classDef deleted fill:#ffcdd2,stroke:#c62828,color:#b71c1c',
+  ];
   const nodeMap = {};
 
   for (const node of data.impactNodes) {
@@ -34,7 +47,11 @@ function impactMapToMermaid(data) {
     nodeMap[node.id] = safeId;
     const label = (node.label || node.id).slice(0, 40).replace(/"/g, "'");
     const change = node.changeType !== 'unchanged' ? `\\n[${node.changeType}]` : '';
-    lines.push(`  ${safeId}["${label}${change}"]`);
+    const styleClass = node.changeType !== 'unchanged' ? `:::${node.changeType}` : '';
+    lines.push(`  ${safeId}["${label}${change}"]${styleClass}`);
+    // tooltip にオリジナルIDを渡すことで、コールバックから直接 /nodes?id= に使える
+    const tooltipId = node.id.replace(/"/g, "'");
+    lines.push(`  click ${safeId} __mermaidNodeClick__ "${tooltipId}"`);
   }
 
   for (const edge of data.edges || []) {
@@ -215,47 +232,42 @@ function IntentContextView({ data }) {
 
 /**
  * ズーム/パン操作をサポートするコンテナ。
- * マウスホイールでズーム、ドラッグでパン。
+ * transform と onTransformChange を外部から受け取るコントロールドコンポーネント。
  */
-function ZoomPanContainer({ children }) {
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+function ZoomPanContainer({ children, transform, onTransformChange }) {
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
   const onWheel = useCallback((e) => {
     e.preventDefault();
     const factor = e.deltaY > 0 ? 0.9 : 1.1;
-    setTransform((prev) => ({
+    onTransformChange((prev) => ({
       ...prev,
       scale: Math.max(0.1, Math.min(5, prev.scale * factor)),
     }));
-  }, []);
+  }, [onTransformChange]);
 
   const onMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
     isDragging.current = true;
-    dragStart.current = {
-      x: e.clientX - transform.x,
-      y: e.clientY - transform.y,
-    };
-  }, [transform.x, transform.y]);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+  }, []);
 
   const onMouseMove = useCallback((e) => {
     if (!isDragging.current) return;
-    setTransform((prev) => ({
-      ...prev,
-      x: e.clientX - dragStart.current.x,
-      y: e.clientY - dragStart.current.y,
-    }));
-  }, []);
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    onTransformChange((prev) => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+  }, [onTransformChange]);
 
   const onMouseUp = useCallback(() => {
     isDragging.current = false;
   }, []);
 
-  const resetTransform = () => setTransform({ x: 0, y: 0, scale: 1 });
-  const zoomIn = () => setTransform((p) => ({ ...p, scale: Math.min(5, p.scale * 1.2) }));
-  const zoomOut = () => setTransform((p) => ({ ...p, scale: Math.max(0.1, p.scale * 0.8) }));
+  const resetTransform = useCallback(() => onTransformChange({ x: 0, y: 0, scale: 1 }), [onTransformChange]);
+  const zoomIn = useCallback(() => onTransformChange((prev) => ({ ...prev, scale: Math.min(5, prev.scale * 1.2) })), [onTransformChange]);
+  const zoomOut = useCallback(() => onTransformChange((prev) => ({ ...prev, scale: Math.max(0.1, prev.scale * 0.8) })), [onTransformChange]);
 
   return (
     <div
@@ -287,23 +299,67 @@ function ZoomPanContainer({ children }) {
 /**
  * 可視化キャンバスペイン（中央ペイン）。
  * 5モードのタブ切替とMermaidダイアグラム描画を担当する。
+ * モード別にZoomPan状態を保持し、タブ切替後も位置・ズームが維持される。
+ * onNodeClick を受け取り、impactMap のノードクリック時に呼び出す。
  */
-export function VisualizationPane({ modes, activeMode, onModeChange }) {
+export function VisualizationPane({ modes, activeMode, onModeChange, onNodeClick }) {
+  const [transforms, setTransforms] = useState(
+    () => Object.fromEntries(MODE_KEYS.map((k) => [k, { x: 0, y: 0, scale: 1 }]))
+  );
+  const tabRefs = useRef({});
+
+  // グローバルコールバックを最新の onNodeClick に同期する
+  useEffect(() => {
+    _globalNodeClickCallback = onNodeClick || null;
+    return () => {
+      // 自分が登録したコールバックのみ解除する（複数インスタンス対策）
+      if (_globalNodeClickCallback === onNodeClick) {
+        _globalNodeClickCallback = null;
+      }
+    };
+  }, [onNodeClick]);
+
+  const handleTransformChange = useCallback((updater) => {
+    setTransforms((prev) => ({
+      ...prev,
+      [activeMode]: typeof updater === 'function' ? updater(prev[activeMode]) : updater,
+    }));
+  }, [activeMode]);
+
+  const handleTabKeyDown = useCallback((e, currentKey) => {
+    const currentIdx = MODE_KEYS.indexOf(currentKey);
+    let nextKey = null;
+    if (e.key === 'ArrowRight') {
+      nextKey = MODE_KEYS[(currentIdx + 1) % MODE_KEYS.length];
+    } else if (e.key === 'ArrowLeft') {
+      nextKey = MODE_KEYS[(currentIdx - 1 + MODE_KEYS.length) % MODE_KEYS.length];
+    }
+    if (nextKey) {
+      e.preventDefault();
+      onModeChange(nextKey);
+      tabRefs.current[nextKey]?.focus();
+    }
+  }, [onModeChange]);
+
   const modeResult = modes?.[activeMode];
   const chart = getMermaidChart(activeMode, modeResult);
   const isIntentContext = activeMode === 'intentContext';
 
   return (
     <div className="visualization-pane">
-      <div className="mode-tabs">
+      <div className="mode-tabs" role="tablist">
         {MODE_KEYS.map((key) => {
           const result = modes?.[key];
           const isFailed = result && !result.success;
           return (
             <button
               key={key}
+              ref={(el) => { tabRefs.current[key] = el; }}
+              role="tab"
+              aria-selected={activeMode === key}
               className={`mode-tab${activeMode === key ? ' active' : ''}${isFailed ? ' failed' : ''}`}
               onClick={() => onModeChange(key)}
+              onKeyDown={(e) => handleTabKeyDown(e, key)}
               title={isFailed ? result.error : undefined}
             >
               {MODE_LABELS[key]}
@@ -324,7 +380,10 @@ export function VisualizationPane({ modes, activeMode, onModeChange }) {
           <IntentContextView data={modeResult.data} />
         </div>
       ) : chart ? (
-        <ZoomPanContainer>
+        <ZoomPanContainer
+          transform={transforms[activeMode]}
+          onTransformChange={handleTransformChange}
+        >
           <MermaidDiagram chart={chart} />
         </ZoomPanContainer>
       ) : (

@@ -1,9 +1,72 @@
 /**
- * レビュー情報ペイン（右ペイン）。
- * 3行要約・レビュー観点・リスク注釈を表示する。
- * 表示内容はモード切替に関わらず常に同じデータを参照する。
+ * ノード詳細セクション。
+ * ノード未選択時はプレースホルダーを表示する。
+ * 選択時はコード断片・リスク情報・AI解説を表示する。
  */
-export function ReviewInfoPane({ modes }) {
+function NodeDetailSection({ selectedNodeId, nodeDetail, nodeDetailLoading, nodeDetailError, aiExplanation, explainLoading }) {
+  if (!selectedNodeId) {
+    return (
+      <div className="review-section node-detail-section">
+        <h4>ノード詳細</h4>
+        <p className="no-data">図のノードをクリックすると詳細が表示されます</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="review-section node-detail-section">
+      <h4>ノード詳細</h4>
+      <div className="node-detail-id" title={selectedNodeId}>
+        {selectedNodeId.length > 50 ? `...${selectedNodeId.slice(-47)}` : selectedNodeId}
+      </div>
+
+      {nodeDetailLoading && <p className="no-data">読み込み中...</p>}
+
+      {nodeDetailError && <p className="no-data">取得失敗: {nodeDetailError}</p>}
+
+      {nodeDetail && (
+        <>
+          {nodeDetail.riskLevel && (
+            <div className="node-detail-risk">
+              <span className={`risk-badge ${nodeDetail.riskLevel}`}>
+                {nodeDetail.riskLevel.toUpperCase()}
+              </span>
+              {nodeDetail.riskReason && (
+                <span className="risk-text">{nodeDetail.riskReason}</span>
+              )}
+            </div>
+          )}
+
+          {nodeDetail.codeSnippet ? (
+            <div className="node-detail-code">
+              <div className="node-detail-label">コード断片</div>
+              <pre className="code-snippet">{nodeDetail.codeSnippet}</pre>
+            </div>
+          ) : (
+            <p className="no-data">コード断片なし</p>
+          )}
+        </>
+      )}
+
+      <div className="node-detail-ai">
+        <div className="node-detail-label">AI解説</div>
+        {explainLoading && <p className="no-data">AI解説を生成中...</p>}
+        {!explainLoading && aiExplanation && (
+          <p className="ai-explanation">{aiExplanation}</p>
+        )}
+        {!explainLoading && !aiExplanation && !nodeDetailLoading && (
+          <p className="no-data">AI解説なし</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * レビュー情報ペイン（右ペイン）。
+ * 上部にノード詳細（選択時）、下部にPR全体の要約・レビュー観点・リスク注釈を表示する。
+ */
+export function ReviewInfoPane({ modes, selectedNodeId, nodeDetail, nodeDetailLoading, nodeDetailError, aiExplanation, explainLoading }) {
   const intentData = modes?.intentContext?.success ? modes.intentContext.data : null;
   const impactData = modes?.impactMap?.success ? modes.impactMap.data : null;
   const archData = modes?.architectureCompliance?.success ? modes.architectureCompliance.data : null;
@@ -20,6 +83,16 @@ export function ReviewInfoPane({ modes }) {
       <div className="pane-header">
         <h3>レビュー情報</h3>
       </div>
+
+      {/* ノード詳細（上部）*/}
+      <NodeDetailSection
+        selectedNodeId={selectedNodeId}
+        nodeDetail={nodeDetail}
+        nodeDetailLoading={nodeDetailLoading}
+        nodeDetailError={nodeDetailError}
+        aiExplanation={aiExplanation}
+        explainLoading={explainLoading}
+      />
 
       {/* 3行要約 */}
       <div className="review-section">
