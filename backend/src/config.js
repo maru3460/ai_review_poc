@@ -33,7 +33,9 @@ function validateEnv(env = process.env) {
     // OPENAI_API_KEY は省略可能。未設定時は静的解析・モード生成をスキップする。
     openaiApiKey: env.OPENAI_API_KEY || null,
     llmProvider: env.LLM_PROVIDER || "openai",
-    llmModel: env.LLM_MODEL || "gpt-4o-mini"
+    llmModel: env.LLM_MODEL || "gpt-4o-mini",
+    // FRONTEND_URL は省略可能。未設定時はPRコメント投稿をスキップする。
+    frontendUrl: env.FRONTEND_URL || null
   };
 }
 

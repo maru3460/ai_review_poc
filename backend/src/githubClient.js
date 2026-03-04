@@ -20,6 +20,10 @@ class GithubClient {
     return this.request(path, { ...options, method: "GET" });
   }
 
+  async post(path, body, options = {}) {
+    return this.request(path, { ...options, method: "POST", body });
+  }
+
   async request(path, options = {}) {
     const attempts = options.attempts || 3;
     const method = options.method || "GET";
@@ -31,10 +35,15 @@ class GithubClient {
     };
 
     let lastError;
+    const fetchOptions = { method, headers };
+    if (options.body !== undefined) {
+      fetchOptions.body = JSON.stringify(options.body);
+      headers["Content-Type"] = "application/json";
+    }
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
-        const response = await this.fetchImpl(`${this.apiBaseUrl}${path}`, { method, headers });
+        const response = await this.fetchImpl(`${this.apiBaseUrl}${path}`, fetchOptions);
         if (response.ok) {
           const data = await response.json();
           return {
@@ -55,6 +64,10 @@ class GithubClient {
           responseBody
         });
       } catch (error) {
+        // non-retryable な GithubApiError は即座に再throwする
+        if (error instanceof GithubApiError) {
+          throw error;
+        }
         lastError = error;
         if (attempt < attempts) {
           await sleep(backoffMs(attempt));

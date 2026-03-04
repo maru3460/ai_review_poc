@@ -7,6 +7,7 @@ const { buildGraph } = require("./graphBuilder");
 const { generateAllModes } = require("./modeGenerator");
 const { saveModeResults } = require("./modeResultStore");
 const { createLlmClient } = require("./llmClient");
+const { postVisualizationComment } = require("./prCommentPoster");
 
 function createJobProcessor(config) {
   const githubClient = new GithubClient({
@@ -33,6 +34,18 @@ function createJobProcessor(config) {
         prNumber: job.prNumber
       });
       const outputPath = await savePullRequestMetadata(metadata);
+
+      // メタ情報収集完了後にコメント投稿（LLM解析スキップ時も投稿する）
+      const commentResult = await postVisualizationComment({
+        githubClient,
+        repositoryFullName: metadata.repositoryFullName,
+        prNumber: metadata.prNumber,
+        frontendBaseUrl: config.frontendUrl,
+        prTitle: metadata.prTitle
+      });
+      if (!commentResult.posted) {
+        console.warn(`[jobProcessor] コメント投稿スキップ/失敗: ${commentResult.reason}`);
+      }
 
       if (config.openaiApiKey) {
         const analysis = await analyzeStaticGraph({

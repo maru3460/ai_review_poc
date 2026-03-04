@@ -33,7 +33,7 @@
 - [x] 9. 3ペインUI実装
 - [x] 10. モード切替UX実装
 - [ ] 11. ノード詳細連動（コード断片 + AI解説）
-- [ ] 12. PRコメント投稿
+- [x] 12. PRコメント投稿
 - [ ] 13. 性能計測と最適化（PoC範囲）
 - [ ] 14. 精度検証（PoC許容70%）
 - [ ] 15. 成功基準評価とデモ準備
@@ -297,3 +297,4 @@
 - 2026-03-04: タスク8「可視化ページAPI」実装完了。`server.js` に `/api/prs/:owner/:repo/:prNumber/visualization`（5モード統合データ）、`/status`（ジョブ進捗）、`/nodes`（ノード詳細・隣接ノード・リスク情報・ファイル内容）の3エンドポイントを実装。CORS対応済み。
 - 2026-03-04: タスク9「3ペインUI実装」実装完了。Vite + React + react-router-dom + mermaid でフロントエンドを構築。`/prs/:owner/:repo/:prNumber` でPR可視化ページにアクセス。左ペイン（変更ファイルツリー）、中央ペイン（Mermaid図 + 5モードタブ + ズーム/パン）、右ペイン（3行要約・レビュー観点・リスク注釈）の3ペインレイアウトを実装。ポーリングによる処理待ち対応。`frontend/src/server.js` を静的ファイルサーバー（SPA fallback付き）に更新。`railway.toml` にビルドコマンドを追加。
 - 2026-03-04: タスク10「モード切替UX実装」実装完了。`VisualizationPane.jsx` を修正。ZoomPanContainerをコントロールドコンポーネント化（transform/onTransformChangeをprops受け取り）、VisualizationPaneにモード別transforms状態を追加（タブ切替後もズーム位置が維持される）、impactMapToMermaidにclassDefによるchangeType色分け（added=緑/modified=橙/deleted=赤）を追加、モードタブにrole="tablist"/role="tab"とArrowLeft/ArrowRightキーボードナビゲーションを追加。onMouseDownをデルタベース方式に変更しドラッグ中の不要な関数再生成を解消。
+- 2026-03-04: タスク12「PRコメント投稿」実装完了。`prCommentPoster.js`（可視化URLのPRコメント投稿、投稿失敗時はログ記録して継続）を新規作成。`githubClient.js`（`post()` メソッド追加、request()のbodyサポート追加、non-retryable GithubApiErrorの即座再throw修正）、`config.js`（`FRONTEND_URL` オプション追加）、`jobProcessor.js`（メタ情報収集完了後にコメント投稿、結果ログ記録）、`.env.example` を更新。`FRONTEND_URL` 未設定時はスキップ。自動起動/mention起動の両方で動作。テスト94件全パス。
